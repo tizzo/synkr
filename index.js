@@ -25,7 +25,19 @@ var getPathsToWatchArray = function(config) {
 
 var processChange = function(changeType, filePath) {
   winston.info(changeType, filePath);
-  createRsyncCommand(filePath);
+  respondToChange(changeType, filePath);
+}
+
+
+var respondToChange = function(changeType, filePath) {
+  conf = findOptionDefinition(filePath);
+  // TODO: Wihtout using -r (which we don't want to do because this is
+  // targetted) we'll need to separately do a mkdir -p
+  var options = conf.commandOptions.join(' ');
+  var remoteSystem = conf.remoteUser + '@' + conf.remoteHost + ':' + conf.remotePort;
+  var remotePath = conf.remotePath;
+  command = conf.command + ' ' + options + ' ' + filePath + ' ' + remoteSystem + remotePath;
+  console.log(command);
 }
 
 var findOptionDefinition = function(filePath) {
@@ -40,10 +52,6 @@ var findOptionDefinition = function(filePath) {
     throw new Error('Invalid change path');
   }
   return config.pathsToWatch[match];
-}
-
-var createRsyncCommand = function(filePath) {
-  console.log(findOptionDefinition(filePath));
 }
 
 watchr.watch({
