@@ -1,0 +1,19 @@
+{
+  "name": "rsync-watch",
+  "version": "0.0.0",
+  "description": "Watches a configurable set of directories and sends changes to a second server via rsync.",
+  "main": "index.js",
+  "dependencies": {
+    "request": "~2.12.0",
+    "watchr": "~2.3.1",
+    "js-yaml": "1.0.3",
+    "winston": "~0.6.2"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "start": "node index.js"
+  },
+  "repository": "",
+  "author": "Howard Tyson",
+  "license": "BSD"
+}
