@@ -39,7 +39,7 @@ var processChange = function(changeType, filePath, fileCurrentStat) {
       });
     }
   });
-}
+};
 
 // The returned local path should include the leading slash.
 var getLocalPath = function(filePath, conf) {
@@ -70,12 +70,12 @@ var createDirectory = function(conf, changeType, filePath, fileCurrentStat, done
     winston.info(command);
   }
   done(null, true);
-}
+};
 
 var syncFile = function(conf, changeType, filePath, fileCurrentStat, done) {
   buildSyncCommand(conf, changeType, filePath, conf);
   done(null, true);
-}
+};
 
 var buildSyncCommand = function(conf, changeType, filePath, conf) {
   // TODO: Wihtout using -r (which we don't want to do because this is
@@ -85,11 +85,11 @@ var buildSyncCommand = function(conf, changeType, filePath, conf) {
   var remotePath = conf.remotePath;
   command = conf.command + ' ' + options + ' ' + filePath + ' ' + remoteSystem + remotePath;
   console.log(command);
-}
+};
 
 var runSyncCommand = function() {
 
-}
+};
 
 var findOptionDefinition = function(filePath) {
   var match = '';
@@ -105,7 +105,8 @@ var findOptionDefinition = function(filePath) {
   conf = config.pathsToWatch[match];
   conf.localPath = match;
   return conf;
-}
+};
+
 
 var changeHandler = function(changeType, filePath, fileCurrentStat, filePreviousStat) {
   if (changeType == 'create' || changeType == 'update') {
@@ -145,7 +146,7 @@ var createOrUpdateHandler = function(changeType, filePath, fileCurrentStat, file
     processChange(changeType, filePath, fileCurrentStat);
     winston.info(filePath + " " + changeType + "d.");
   }
-}
+};
 
 watchr.watch({
   paths: getPathsToWatchArray(config),
