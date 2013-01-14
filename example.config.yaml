@@ -1,0 +1,15 @@
+# An array of paths to watch for new content.
+pathsToWatch:
+  "/Users/howard/Desktop":
+    remoteServer: jtflnfs1.templeton.org
+    remoteUser: webadmin
+    remotePort: 22
+    command: rsync
+    commandOptions:
+    remotePath: '/backups/somefolder'
+# An array fo file extensions to exclude from triggering a scan.
+fileTypesToExclude: [
+  "nfo",
+  "tbn"
+]
+ignoreHiddenFiles: true
