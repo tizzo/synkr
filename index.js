@@ -23,14 +23,43 @@ var getPathsToWatchArray = function(config) {
   return paths;
 }
 
-var processChange = function(changeType, filePath) {
+var processChange = function(changeType, filePath, fileCurrentStat) {
+  var conf = findOptionDefinition(filePath);
   winston.info(changeType, filePath);
-  respondToChange(changeType, filePath);
+  createDirectory(conf, changeType, filePath, fileCurrentStat, function(error, success) {
+    if (error) {
+      winston.error('Synchronization for ' +  filePath + ' not completed because ensuring the directory exists was not possible.');
+    }
+    else {
+      syncFile(conf, changeType, filePath, fileCurrentStat, function(error, success) {
+        winston.info('Synchronization complete');
+      });
+    }
+  });
 }
 
+var createDirectory = function(conf, changeType, filePath, fileCurrentStat, done) {
+  // TODO: Cache a list of already created directories as an optimization.
+  // relativePath should include the trailing slash.
+  // fs.stat(filePath,
+  directoryToEnsure = filePath.substring(conf.localPath.length);
+  // fileCurrentStat could be null because this is a deletion.
+  if (fileCurrentStat !== null && !fileCurrentStat.isDirectory()) {
+    directoryToEnsure = directoryToEnsure.split('/');
+    directoryToEnsure.pop();
+    directoryToEnsure = directoryToEnsure.join('/');
+  }
+  var command = 'mkdir -p ' + conf.remotePath + directoryToEnsure;
+  winston.error(command);
+  done(null, true);
+}
 
-var respondToChange = function(changeType, filePath) {
-  conf = findOptionDefinition(filePath);
+var syncFile = function(conf, changeType, filePath, fileCurrentStat, done) {
+  buildSyncCommand(conf, changeType, filePath, conf);
+  done(null, true);
+}
+
+var buildSyncCommand = function(conf, changeType, filePath, conf) {
   // TODO: Wihtout using -r (which we don't want to do because this is
   // targetted) we'll need to separately do a mkdir -p
   var options = conf.commandOptions.join(' ');
@@ -38,6 +67,10 @@ var respondToChange = function(changeType, filePath) {
   var remotePath = conf.remotePath;
   command = conf.command + ' ' + options + ' ' + filePath + ' ' + remoteSystem + remotePath;
   console.log(command);
+}
+
+var runSyncCommand = function() {
+
 }
 
 var findOptionDefinition = function(filePath) {
@@ -51,30 +84,34 @@ var findOptionDefinition = function(filePath) {
   if (match == '') {
     throw new Error('Invalid change path');
   }
-  return config.pathsToWatch[match];
+  conf = config.pathsToWatch[match];
+  conf.localPath = match;
+  return conf;
+}
+
+var changeHandler = function(changeType, filePath, fileCurrentStat, filePreviousStat) {
+  var skip, type, i;
+  skip = false;
+  for (i = 0; i < config.fileTypesToExclude.length; i++) {
+    type = config.fileTypesToExclude[i];
+    if (filePath.search("." + type) !== -1) {
+      skip = true;
+      console.log('extension');
+    }
+    if (config.ignoreHiddenFiles && filePath.search(/\./) === 0) {
+      skip = true;
+    }
+  }
+  if (!skip) {
+    processChange(changeType, filePath, fileCurrentStat);
+    winston.info(filePath + " " + changeType + "d.");
+  }
 }
 
 watchr.watch({
   paths: getPathsToWatchArray(config),
   listeners: {
-    change: function(changeType, filePath, fileCurrentStat, filePreviousStat) {
-      var skip, type, i;
-      skip = false;
-      for (i = 0; i < config.fileTypesToExclude.length; i++) {
-        type = config.fileTypesToExclude[i];
-        if (filePath.search("." + type) !== -1) {
-          skip = true;
-          console.log('extension');
-        }
-        if (config.ignoreHiddenFiles && filePath.search(/\./) === 0) {
-          skip = true;
-        }
-      }
-      if (!skip) {
-        processChange(changeType, filePath);
-        winston.info(filePath + " " + changeType + "d.");
-      }
-    }
+    change: changeHandler
   },
   next: function(err, watchers) {
     return winston.info(getPathsToWatchArray(config).join(', ') + " now watched for changes.");
