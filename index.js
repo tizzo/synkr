@@ -12,6 +12,9 @@ require('js-yaml');
 // Load our configuration from the yaml file.
 var config = require('./config');
 
+// A local cache of directories that should be in a known-existent state.
+var directoriesEnsured = [];
+
 /**
  * Gets a flat array of configured paths to watch.
  */
@@ -38,19 +41,34 @@ var processChange = function(changeType, filePath, fileCurrentStat) {
   });
 }
 
-var createDirectory = function(conf, changeType, filePath, fileCurrentStat, done) {
-  // TODO: Cache a list of already created directories as an optimization.
-  // relativePath should include the trailing slash.
-  // fs.stat(filePath,
-  directoryToEnsure = filePath.substring(conf.localPath.length);
-  // fileCurrentStat could be null because this is a deletion.
+// The returned local path should include the leading slash.
+var getLocalPath = function(filePath, conf) {
+  var conf = findOptionDefinition(filePath);
+  return filePath.substring(conf.localPath.length);
+};
+
+var findDirectoryPath = function(filePath, fileCurrentStat) {
   if (fileCurrentStat !== null && !fileCurrentStat.isDirectory()) {
-    directoryToEnsure = directoryToEnsure.split('/');
+    directoryToEnsure = filePath.split('/');
     directoryToEnsure.pop();
     directoryToEnsure = directoryToEnsure.join('/');
   }
-  var command = 'mkdir -p ' + conf.remotePath + directoryToEnsure;
-  winston.error(command);
+  else {
+    directoryToEnsure = filePath;
+  }
+  return directoryToEnsure
+};
+
+var createDirectory = function(conf, changeType, filePath, fileCurrentStat, done) {
+  directoryToEnsure = findDirectoryPath(filePath, fileCurrentStat);
+  directoryToEnsure = getLocalPath(directoryToEnsure);
+  winston.info('trying to ensure ' + directoryToEnsure);
+  if (directoriesEnsured.indexOf(directoryToEnsure) === -1) {
+    // fileCurrentStat could be null because this is a deletion.
+    var command = 'mkdir -p ' + conf.remotePath + directoryToEnsure;
+    directoriesEnsured.push(directoryToEnsure);
+    winston.info(command);
+  }
   done(null, true);
 }
 
@@ -90,6 +108,27 @@ var findOptionDefinition = function(filePath) {
 }
 
 var changeHandler = function(changeType, filePath, fileCurrentStat, filePreviousStat) {
+  if (changeType == 'create' || changeType == 'update') {
+    createOrUpdateHandler(changeType, filePath, fileCurrentStat, filePreviousStat);
+  }
+  else if (changeType == 'delete') {
+    deleteHandler(changeType, filePath, fileCurrentStat, filePreviousStat);
+  }
+  else {
+    throw new Error('Invalid change type `' + changeType + '` on file `' + filePath + '`.');
+  }
+};
+
+var deleteHandler = function(changeType, filePath, fileCurrentStat, filePreviousStat) {
+  var localPath = getLocalPath(filePath);
+  console.log('delete handler triggered');
+  if (directoriesEnsured.indexOf(localPath) != -1) {
+    directoriesEnsured.splice(directoriesEnsured.indexOf(localPath), 1);
+  }
+};
+
+var createOrUpdateHandler = function(changeType, filePath, fileCurrentStat, filePreviousStat) {
+
   var skip, type, i;
   skip = false;
   for (i = 0; i < config.fileTypesToExclude.length; i++) {
