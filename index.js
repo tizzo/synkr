@@ -5,6 +5,8 @@ var fs = require('fs'),
   watchr = require('watchr'),
   winston = require('winston');
 
+require('./lib/ssh-connection')
+
 // Just requiring this allows us to use a yaml config
 // file rather than JSON via require calls.
 require('js-yaml');
