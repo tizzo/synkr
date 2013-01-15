@@ -5,7 +5,11 @@ var fs = require('fs'),
   watchr = require('watchr'),
   winston = require('winston');
 
-connection = require('./lib/ssh-connection');
+var connection = require('./lib/ssh-connection');
+
+var queue = [];
+// Are we currently in the process of running the queue?
+var queueProcessing = false;
 
 connection.configure({
   host: '33.33.33.115',
@@ -37,21 +41,6 @@ var getPathsToWatchArray = function(config) {
   return paths;
 }
 
-var processChange = function(changeType, filePath, fileCurrentStat) {
-  var conf = findOptionDefinition(filePath);
-  winston.info(changeType, filePath);
-  createDirectory(conf, changeType, filePath, fileCurrentStat, function(error, success) {
-    if (error) {
-      winston.error('Synchronization for ' + filePath + ' not completed because ensuring the directory exists was not possible.');
-    }
-    else {
-      syncFile(conf, changeType, filePath, fileCurrentStat, function(error, success) {
-        winston.info('Synchronization complete');
-      });
-    }
-  });
-};
-
 // The returned local path should include the leading slash.
 var getLocalPath = function(filePath, conf) {
   var conf = findOptionDefinition(filePath);
@@ -70,7 +59,7 @@ var findDirectoryPath = function(filePath, fileCurrentStat) {
   return directoryToEnsure
 };
 
-var createDirectory = function(conf, changeType, filePath, fileCurrentStat, done) {
+var createDirectory = function(changeType, filePath, fileCurrentStat, conf, done) {
   directoryToEnsure = findDirectoryPath(filePath, fileCurrentStat);
   directoryToEnsure = getLocalPath(directoryToEnsure);
   winston.info('trying to ensure ' + directoryToEnsure);
@@ -80,7 +69,10 @@ var createDirectory = function(conf, changeType, filePath, fileCurrentStat, done
     directoriesEnsured.push(directoryToEnsure);
     winston.info(command);
   }
-  done(null, true);
+  // TODO: Should we do this over sftp rather than exec?
+  connection.exec(command, function(error, exitCode) {
+    done(error, true);
+  });
 };
 
 var syncFile = function(conf, changeType, filePath, fileCurrentStat, done) {
@@ -89,23 +81,32 @@ var syncFile = function(conf, changeType, filePath, fileCurrentStat, done) {
 };
 
 var buildSyncCommand = function(conf, changeType, filePath, conf) {
-  // TODO: Wihtout using -r (which we don't want to do because this is
-  // targetted) we'll need to separately do a mkdir -p
   var options = conf.commandOptions.join(' ');
   var remoteSystem = conf.remoteUser + '@' + conf.remoteHost + ':' + conf.remotePort;
-  var remotePath = conf.remotePath;
-  command = conf.command + ' ' + options + ' ' + filePath + ' ' + remoteSystem + remotePath;
-  console.log(command);
-  console.log(filePath, remotePath);
-  connection.transferFile(filePath, remotePath + getLocalPath(filePath), function() {
+  command = conf.command + ' ' + options + ' ' + filePath + ' ' + remoteSystem + getRemotePath(filePath, conf);
+  connection.transferFile(filePath, getRemotePath(filePath, conf), function() {
     winston.info('looks done.');
   });
 };
 
-var runSyncCommand = function() {
+var enqueueCommand = function(command, arguments) {
+  queue.push([command, arguments]);
+  if (!queueProcessing) {
+    processQueue();
+  }
+}
 
-};
+var processQueue = function() {
+  queueProcessing = true;
+  while (item = queue.shift()) {
+    item[0].apply(this, item[1] || []);
+  }
+  queueProcessing = false;
+}
 
+/**
+ * Locate the option definition appropriate to this path.
+ */
 var findOptionDefinition = function(filePath) {
   var match = '';
   for (path in config.pathsToWatch) {
@@ -123,41 +124,67 @@ var findOptionDefinition = function(filePath) {
 };
 
 
+var processChange = function(changeType, filePath, fileCurrentStat, filePreviousStat, conf) {
+  winston.info(changeType, filePath);
+  createDirectory(changeType, filePath, fileCurrentStat, conf, function(error, success) {
+    if (error) {
+      winston.error('Synchronization for ' + filePath + ' not completed because ensuring the directory exists was not possible.');
+    }
+    else if (!fileCurrentStat.isDirectory()) {
+      syncFile(conf, changeType, filePath, fileCurrentStat, function(error, success) {
+        winston.info('Synchronization complete');
+      });
+    }
+  });
+};
+
 var changeHandler = function(changeType, filePath, fileCurrentStat, filePreviousStat) {
+  var conf = findOptionDefinition(filePath);
   if (changeType == 'create' || changeType == 'update') {
-    createOrUpdateHandler(changeType, filePath, fileCurrentStat, filePreviousStat);
+    createOrUpdateHandler(changeType, filePath, fileCurrentStat, filePreviousStat, conf);
   }
   else if (changeType == 'delete') {
-    deleteHandler(changeType, filePath, fileCurrentStat, filePreviousStat);
+    // deleteHandler(changeType, filePath, fileCurrentStat, filePreviousStat, conf);
+    enqueueCommand(deleteHandler, [changeType, filePath, fileCurrentStat, filePreviousStat, conf]);
   }
   else {
     throw new Error('Invalid change type `' + changeType + '` on file `' + filePath + '`.');
   }
 };
 
-var deleteHandler = function(changeType, filePath, fileCurrentStat, filePreviousStat) {
+var getRemotePath = function(filePath, conf) {
+  var remotePath = conf.remotePath;
+  return remotePath + getLocalPath(filePath);
+}
+
+var deleteHandler = function(changeType, filePath, fileCurrentStat, filePreviousStat, conf) {
   var localPath = getLocalPath(filePath);
-  console.log('delete handler triggered');
   if (directoriesEnsured.indexOf(localPath) != -1) {
     directoriesEnsured.splice(directoriesEnsured.indexOf(localPath), 1);
   }
+  if (filePreviousStat.isDirectory()) {
+    connection.rmdir(getRemotePath(filePath, conf), function() {});
+  }
+  else {
+    connection.delete(getRemotePath(filePath, conf), function() {});
+  }
 };
 
-var createOrUpdateHandler = function(changeType, filePath, fileCurrentStat, filePreviousStat) {
+var createOrUpdateHandler = function(changeType, filePath, fileCurrentStat, filePreviousStat, conf) {
   var skip, type, i;
   skip = false;
+  // TODO: Refactor to move exclusions into the
   for (i = 0; i < config.fileTypesToExclude.length; i++) {
     type = config.fileTypesToExclude[i];
     if (filePath.search("." + type) !== -1) {
       skip = true;
-      console.log('extension');
     }
     if (config.ignoreHiddenFiles && filePath.search(/\./) === 0) {
       skip = true;
     }
   }
   if (!skip) {
-    processChange(changeType, filePath, fileCurrentStat);
+    enqueueCommand(processChange, arguments);
     winston.info(filePath + " " + changeType + "d.");
   }
 };
@@ -165,6 +192,8 @@ var createOrUpdateHandler = function(changeType, filePath, fileCurrentStat, file
 connection.connection.on('ready', function() {
   watchr.watch({
     paths: getPathsToWatchArray(config),
+    ignoreHiddenFiles: true,
+    ignoreCommonPatterns: true,
     listeners: {
       change: changeHandler
     },
@@ -172,7 +201,7 @@ connection.connection.on('ready', function() {
       return winston.info(getPathsToWatchArray(config).join(', ') + " now watched for changes.");
     }
   });
-  connection.transferFile('/Users/howard/Desktop/samplefile.md', '/home/vagrant/somefile.md', function() {
-    winston.info('transfer complete');
-  })
+  // connection.transferFile('/Users/howard/Desktop/samplefile.md', '/home/vagrant/somefile.md', function() {
+  //   winston.info('transfer complete');
+  // })
 });
