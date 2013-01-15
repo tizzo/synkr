@@ -13,13 +13,8 @@ connection.configure({
   username: 'vagrant',
   privateKey: require('fs').readFileSync('/Users/howard/Documents/Code/Node.js/rsync-watch/id_rsa')
 });
-connection.connect();
 connection.setLogger(winston);
-connection.connection.on('ready', function() {
-  connection.transferFile('/Users/howard/Desktop/samplefile.md', '/home/vagrant/somefile.md', function() {
-    winston.info('transfer complete');
-  })
-});
+connection.connect();
 
 // Just requiring this allows us to use a yaml config
 // file rather than JSON via require calls.
@@ -47,7 +42,7 @@ var processChange = function(changeType, filePath, fileCurrentStat) {
   winston.info(changeType, filePath);
   createDirectory(conf, changeType, filePath, fileCurrentStat, function(error, success) {
     if (error) {
-      winston.error('Synchronization for ' +  filePath + ' not completed because ensuring the directory exists was not possible.');
+      winston.error('Synchronization for ' + filePath + ' not completed because ensuring the directory exists was not possible.');
     }
     else {
       syncFile(conf, changeType, filePath, fileCurrentStat, function(error, success) {
@@ -101,6 +96,10 @@ var buildSyncCommand = function(conf, changeType, filePath, conf) {
   var remotePath = conf.remotePath;
   command = conf.command + ' ' + options + ' ' + filePath + ' ' + remoteSystem + remotePath;
   console.log(command);
+  console.log(filePath, remotePath);
+  connection.transferFile(filePath, remotePath + getLocalPath(filePath), function() {
+    winston.info('looks done.');
+  });
 };
 
 var runSyncCommand = function() {
@@ -163,12 +162,17 @@ var createOrUpdateHandler = function(changeType, filePath, fileCurrentStat, file
   }
 };
 
-watchr.watch({
-  paths: getPathsToWatchArray(config),
-  listeners: {
-    change: changeHandler
-  },
-  next: function(err, watchers) {
-    return winston.info(getPathsToWatchArray(config).join(', ') + " now watched for changes.");
-  }
+connection.connection.on('ready', function() {
+  watchr.watch({
+    paths: getPathsToWatchArray(config),
+    listeners: {
+      change: changeHandler
+    },
+    next: function(err, watchers) {
+      return winston.info(getPathsToWatchArray(config).join(', ') + " now watched for changes.");
+    }
+  });
+  connection.transferFile('/Users/howard/Desktop/samplefile.md', '/home/vagrant/somefile.md', function() {
+    winston.info('transfer complete');
+  })
 });
