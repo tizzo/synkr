@@ -1,1 +1,3 @@
-# rsync-watch
+# File Synchronizer
+
+
