@@ -3,13 +3,17 @@ var config, options, request, watchr, winston;
 
 var fs = require('fs'),
   watchr = require('watchr'),
-  winston = require('winston');
+  winston = require('winston'),
+  async = require('async');
 
 var connection = require('./lib/ssh-connection');
 
+// A queue of operations that need to be synchronized with the remote.
 var queue = [];
 // Are we currently in the process of running the queue?
 var queueProcessing = false;
+// Watchers currently watching files.
+var watchers = false;
 
 connection.configure({
   host: '33.33.33.115',
@@ -19,6 +23,8 @@ connection.configure({
 });
 connection.setLogger(winston);
 connection.connect();
+
+
 
 // Just requiring this allows us to use a yaml config
 // file rather than JSON via require calls.
@@ -62,17 +68,19 @@ var findDirectoryPath = function(filePath, fileCurrentStat) {
 var createDirectory = function(changeType, filePath, fileCurrentStat, conf, done) {
   directoryToEnsure = findDirectoryPath(filePath, fileCurrentStat);
   directoryToEnsure = getLocalPath(directoryToEnsure);
-  winston.info('trying to ensure ' + directoryToEnsure);
   if (directoriesEnsured.indexOf(directoryToEnsure) === -1) {
+    winston.info('Trying to ensure `' + directoryToEnsure + '` exists.');
     // fileCurrentStat could be null because this is a deletion.
     var command = 'mkdir -p ' + conf.remotePath + directoryToEnsure;
     directoriesEnsured.push(directoryToEnsure);
-    winston.info(command);
+    // TODO: Should we do this over sftp rather than exec?
+    connection.exec(command, function(error, exitCode) {
+      done(error, true);
+    });
   }
-  // TODO: Should we do this over sftp rather than exec?
-  connection.exec(command, function(error, exitCode) {
-    done(error, true);
-  });
+  else {
+    done(null, true);
+  }
 };
 
 var syncFile = function(conf, changeType, filePath, fileCurrentStat, done) {
@@ -84,8 +92,11 @@ var buildSyncCommand = function(conf, changeType, filePath, conf) {
   var options = conf.commandOptions.join(' ');
   var remoteSystem = conf.remoteUser + '@' + conf.remoteHost + ':' + conf.remotePort;
   command = conf.command + ' ' + options + ' ' + filePath + ' ' + remoteSystem + getRemotePath(filePath, conf);
-  connection.transferFile(filePath, getRemotePath(filePath, conf), function() {
-    winston.info('looks done.');
+  connection.transferFile(filePath, getRemotePath(filePath, conf), function(error, success) {
+    if (error) {
+      winston.error('File `' + filePath + '` failed to sync and was readded to the queue.');
+      enqueueCommand(buildSyncCommand, arguments);
+    }
   });
 };
 
@@ -96,10 +107,23 @@ var enqueueCommand = function(command, arguments) {
   }
 }
 
+/**
+ * Process events waiting in the queue.
+ */
 var processQueue = function() {
   queueProcessing = true;
   while (item = queue.shift()) {
-    item[0].apply(this, item[1] || []);
+    if (connection.connected) {
+      item[0].apply(this, item[1] || []);
+    }
+    // If we have no connection, pop this back in the queue,
+    // restart the connection and exit. When the connection is
+    // ready the queue should try to process itself.
+    else {
+      queue.unshift(item);
+      connection.connect();
+      break;
+    }
   }
   queueProcessing = false;
 }
@@ -163,45 +187,40 @@ var deleteHandler = function(changeType, filePath, fileCurrentStat, filePrevious
     directoriesEnsured.splice(directoriesEnsured.indexOf(localPath), 1);
   }
   if (filePreviousStat.isDirectory()) {
-    connection.rmdir(getRemotePath(filePath, conf), function() {});
+    connection.rmdir(getRemotePath(filePath, conf), function(error) {
+      if (error) {
+        enqueueCommand(deleteHandler, arguments);
+      }
+    });
   }
   else {
-    connection.delete(getRemotePath(filePath, conf), function() {});
+    connection.delete(getRemotePath(filePath, conf), function(error) {
+      if (error) {
+        enqueueCommand(deleteHandler, arguments);
+      }
+    });
   }
 };
 
 var createOrUpdateHandler = function(changeType, filePath, fileCurrentStat, filePreviousStat, conf) {
-  var skip, type, i;
-  skip = false;
-  // TODO: Refactor to move exclusions into the
-  for (i = 0; i < config.fileTypesToExclude.length; i++) {
-    type = config.fileTypesToExclude[i];
-    if (filePath.search("." + type) !== -1) {
-      skip = true;
-    }
-    if (config.ignoreHiddenFiles && filePath.search(/\./) === 0) {
-      skip = true;
-    }
-  }
-  if (!skip) {
-    enqueueCommand(processChange, arguments);
-    winston.info(filePath + " " + changeType + "d.");
-  }
+  enqueueCommand(processChange, arguments);
+  winston.info(filePath + ' ' + changeType + 'd.');
 };
 
-connection.connection.on('ready', function() {
-  watchr.watch({
-    paths: getPathsToWatchArray(config),
-    ignoreHiddenFiles: true,
-    ignoreCommonPatterns: true,
-    listeners: {
-      change: changeHandler
-    },
-    next: function(err, watchers) {
-      return winston.info(getPathsToWatchArray(config).join(', ') + " now watched for changes.");
-    }
-  });
-  // connection.transferFile('/Users/howard/Desktop/samplefile.md', '/home/vagrant/somefile.md', function() {
-  //   winston.info('transfer complete');
-  // })
+watchr.watch({
+  paths: getPathsToWatchArray(config),
+  ignoreHiddenFiles: true,
+  ignoreCommonPatterns: true,
+  listeners: {
+    change: changeHandler
+  },
+  next: function(err, fileWatchers) {
+    console.log('watchers ' + fileWatchers.length);
+    watchers = fileWatchers;
+    return winston.info(getPathsToWatchArray(config).join(', ') + " now watched for changes.");
+  }
+});
+
+connection.on('ready', function() {
+  processQueue();
 });
