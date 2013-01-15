@@ -5,7 +5,21 @@ var fs = require('fs'),
   watchr = require('watchr'),
   winston = require('winston');
 
-require('./lib/ssh-connection')
+connection = require('./lib/ssh-connection');
+
+connection.configure({
+  host: '33.33.33.115',
+  port: 22,
+  username: 'vagrant',
+  privateKey: require('fs').readFileSync('/Users/howard/Documents/Code/Node.js/rsync-watch/id_rsa')
+});
+connection.connect();
+connection.setLogger(winston);
+connection.connection.on('ready', function() {
+  connection.transferFile('/Users/howard/Desktop/samplefile.md', '/home/vagrant/somefile.md', function() {
+    winston.info('transfer complete');
+  })
+});
 
 // Just requiring this allows us to use a yaml config
 // file rather than JSON via require calls.
@@ -131,7 +145,6 @@ var deleteHandler = function(changeType, filePath, fileCurrentStat, filePrevious
 };
 
 var createOrUpdateHandler = function(changeType, filePath, fileCurrentStat, filePreviousStat) {
-
   var skip, type, i;
   skip = false;
   for (i = 0; i < config.fileTypesToExclude.length; i++) {
