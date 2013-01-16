@@ -14,12 +14,6 @@ var queueProcessing = false;
 // Watchers currently watching files.
 var watchers = [];
 
-connection.configure({
-  host: '33.33.33.115',
-  port: 22,
-  username: 'vagrant',
-  privateKey: require('fs').readFileSync('/Users/howard/Documents/Code/Node.js/rsync-watch/id_rsa')
-});
 connection.setLogger(winston);
 
 // Just requiring this allows us to use a yaml config
@@ -28,6 +22,13 @@ require('js-yaml');
 
 // Load our configuration from the yaml file.
 var config = require('./config');
+
+connection.configure({
+  host: config.remoteHost,
+  port: config.remotePort,
+  username: config.remoteUser,
+  privateKey: require('fs').readFileSync(config.privateKeyPath)
+});
 
 // A local cache of directories that should be in a known-existent state.
 var directoriesEnsured = [];
