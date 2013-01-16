@@ -46,7 +46,6 @@ var getPathsToWatchArray = function(config) {
 
 // The returned local path should include the leading slash.
 var getLocalPath = function(filePath, conf) {
-  var conf = findOptionDefinition(filePath);
   return filePath.substring(conf.localPath.length);
 };
 
@@ -62,40 +61,15 @@ var findDirectoryPath = function(filePath, fileCurrentStat) {
   return directoryToEnsure
 };
 
-var createDirectory = function(changeType, filePath, fileCurrentStat, conf, done) {
-  directoryToEnsure = findDirectoryPath(filePath, fileCurrentStat);
-  directoryToEnsure = getLocalPath(directoryToEnsure);
-  if (directoriesEnsured.indexOf(directoryToEnsure) === -1) {
-    winston.info('Trying to ensure `' + directoryToEnsure + '` exists.');
-    // fileCurrentStat could be null because this is a deletion.
-    var command = 'mkdir -p ' + conf.remotePath + directoryToEnsure;
-    directoriesEnsured.push(directoryToEnsure);
-    // TODO: Should we do this over sftp rather than exec?
-    connection.exec(command, function(error, exitCode) {
-      if (error) {
-        console.log(error);
-      }
-      done(error, true);
-    });
-  }
-  else {
-    done(null, true);
-  }
-};
-
 var syncFile = function(conf, changeType, filePath, fileCurrentStat, done) {
-  buildSyncCommand(conf, changeType, filePath, conf);
-  done(null, true);
-};
-
-var buildSyncCommand = function(conf, changeType, filePath, conf) {
-  var options = conf.commandOptions.join(' ');
-  var remoteSystem = conf.remoteUser + '@' + conf.remoteHost + ':' + conf.remotePort;
-  command = conf.command + ' ' + options + ' ' + filePath + ' ' + remoteSystem + getRemotePath(filePath, conf);
   connection.transferFile(filePath, getRemotePath(filePath, conf), function(error, success) {
     if (error) {
       winston.error('File `' + filePath + '` failed to sync and was readded to the queue.');
-      enqueueCommand(buildSyncCommand, arguments);
+      enqueueCommand(syncFile, arguments);
+      done(error);
+    }
+    else {
+      done(null);
     }
   });
 };
@@ -107,25 +81,60 @@ var enqueueCommand = function(command, arguments) {
   }
 }
 
+
+var processQueue = function() {
+  winston.info('Processing Queue');
+  if (queue.length > 0 && queueProcessing == false) {
+    queueProcessing = true;
+    winston.info('Processing Queue Item');
+    processQueueItem(function() {
+    });
+  }
+  else {
+    winston.info('Queue was empty.');
+    queueProcessing = false;
+  }
+}
+
 /**
  * Process events waiting in the queue.
  */
-var processQueue = function() {
-  queueProcessing = true;
-  while (item = queue.shift()) {
+var processQueueItem = function(done) {
+  winston.info('We gots a chain of ' + queue.length + ' items in the queue!');
+  if (queue.length > 0) {
+    if (queue.length > 1) {
+      var nextCallback = processQueueItem;
+    }
+    else {
+      winston.info('Last item in the queue!');
+      var nextCallback = function() {
+        winston.info('Queue processing is done!');
+        queueProcessing = false;
+        processQueue();
+      };
+    }
+    item = queue.shift()
     if (connection.connected) {
+      // TODO: This needs to wait for the previous queue item to complete.
+      // console.log(item[1]);
+      item[1].push(nextCallback);
       item[0].apply(this, item[1] || []);
     }
     // If we have no connection, pop this back in the queue,
     // restart the connection and exit. When the connection is
     // ready the queue should try to process itself.
     else {
+      item[1].pop();
       queue.unshift(item);
+      // The connect event fires queue processing.
       connection.connect();
-      break;
+      done(new Error('Lost connection to SSH.'));
     }
   }
-  queueProcessing = false;
+  else {
+    winston.info('Queue empty.')
+    done(null);
+  }
 }
 
 /**
@@ -148,20 +157,54 @@ var findOptionDefinition = function(filePath) {
 };
 
 
-var createOrUpdateHandler = function(changeType, filePath, fileCurrentStat, filePreviousStat, conf) {
+var createOrUpdateHandler = function(changeType, filePath, fileCurrentStat, filePreviousStat, conf, next) {
   winston.info(changeType, filePath);
   createDirectory(changeType, filePath, fileCurrentStat, conf, function(error, success) {
     if (error) {
       winston.error('Synchronization for ' + filePath + ' not completed because ensuring the directory exists was not possible.');
+      next(error);
       return;
     }
     else if (!fileCurrentStat.isDirectory()) {
       syncFile(conf, changeType, filePath, fileCurrentStat, function(error, success) {
         winston.info('Synchronization complete');
+        next(null);
       });
+    }
+    else {
+      winston.info('Direcotry ' + filePath + ' successfully created');
+      if (typeof next != 'function') {
+        winston.info('****************** Bad next operation encountered ! ******************');
+        console.log(next);
+      }
+      else {
+        next(null);
+      }
     }
   });
 };
+
+var createDirectory = function(changeType, filePath, fileCurrentStat, conf, done) {
+  directoryToEnsure = findDirectoryPath(filePath, fileCurrentStat);
+  directoryToEnsure = getLocalPath(directoryToEnsure, conf);
+  if (directoriesEnsured.indexOf(directoryToEnsure) === -1) {
+    winston.info('Trying to ensure `' + directoryToEnsure + '` exists.');
+    // fileCurrentStat could be null because this is a deletion.
+    var command = 'mkdir -p ' + conf.remotePath + directoryToEnsure;
+    directoriesEnsured.push(directoryToEnsure);
+    // TODO: Should we do this over sftp rather than exec?
+    connection.exec(command, function(error, exitCode) {
+      if (error) {
+        winston.error('This is an error of some kind', error);
+      }
+      done(error, true);
+    });
+  }
+  else {
+    done(null, true);
+  }
+};
+
 
 var changeHandler = function(changeType, filePath, fileCurrentStat, filePreviousStat) {
   winston.info(filePath + ' ' + changeType + 'd.');
@@ -180,11 +223,11 @@ var changeHandler = function(changeType, filePath, fileCurrentStat, filePrevious
 
 var getRemotePath = function(filePath, conf) {
   var remotePath = conf.remotePath;
-  return remotePath + getLocalPath(filePath);
+  return remotePath + getLocalPath(filePath, conf);
 }
 
-var deleteHandler = function(changeType, filePath, fileCurrentStat, filePreviousStat, conf) {
-  var localPath = getLocalPath(filePath);
+var deleteHandler = function(changeType, filePath, fileCurrentStat, filePreviousStat, conf, next) {
+  var localPath = getLocalPath(filePath, conf);
   if (directoriesEnsured.indexOf(localPath) != -1) {
     directoriesEnsured.splice(directoriesEnsured.indexOf(localPath), 1);
   }
@@ -192,6 +235,10 @@ var deleteHandler = function(changeType, filePath, fileCurrentStat, filePrevious
     connection.rmdir(getRemotePath(filePath, conf), function(error) {
       if (error) {
         enqueueCommand(deleteHandler, arguments);
+        next(error);
+      }
+      else {
+        next(null);
       }
     });
   }
@@ -199,20 +246,22 @@ var deleteHandler = function(changeType, filePath, fileCurrentStat, filePrevious
     connection.delete(getRemotePath(filePath, conf), function(error) {
       if (error) {
         enqueueCommand(deleteHandler, arguments);
+        next(error);
+      }
+      else {
+        next(null);
       }
     });
   }
 };
-
 watchr.watch({
   paths: getPathsToWatchArray(config),
   ignoreHiddenFiles: config.ignoreHiddenFiles,
-  ignoreCommonPatterns: true,
+  ignoreCommonPatterns: config.ignoreCommonPatterns,
   listeners: {
     change: changeHandler,
     watching: function(error, watcherInstance, isWatching) {
       watchers.push(watcherInstance);
-      console.log('watchers ' + watchers.length);
     },
   },
   next: function(err, fileWatchers) {
