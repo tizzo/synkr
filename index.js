@@ -100,7 +100,7 @@ var processQueue = function() {
  * Process events waiting in the queue.
  */
 var processQueueItem = function(done) {
-  winston.info('We gots a chain of ' + queue.length + ' items in the queue!');
+  winston.info('There are currently ' + queue.length + ' items in the queue!');
   if (queue.length > 0) {
     if (queue.length > 1) {
       var nextCallback = processQueueItem;
@@ -115,8 +115,6 @@ var processQueueItem = function(done) {
     }
     item = queue.shift()
     if (connection.connected) {
-      // TODO: This needs to wait for the previous queue item to complete.
-      // console.log(item[1]);
       item[1].push(nextCallback);
       item[0].apply(this, item[1] || []);
     }
@@ -167,7 +165,6 @@ var createOrUpdateHandler = function(changeType, filePath, fileCurrentStat, file
     }
     else if (!fileCurrentStat.isDirectory()) {
       syncFile(conf, changeType, filePath, fileCurrentStat, function(error, success) {
-        winston.info('Synchronization complete');
         next(null);
       });
     }
@@ -254,10 +251,37 @@ var deleteHandler = function(changeType, filePath, fileCurrentStat, filePrevious
     });
   }
 };
+
+var getPatterns = function(config) {
+  patterns = [];
+  for (i in config.fileTypesToExclude) {
+    // patterns.push(new RegExp('.*\.' + config.fileTypesToExclude[i]));
+  }
+  for (i in config.patternsToExclude) {
+    // patterns.push(new RegExp(config.patternsToExclude[i]));
+  }
+  // console.log(patterns);
+  // return patterns;
+  return new RegExp('fdsa')
+}
+
+var getPathsToIgnore = function(config) {
+  paths = [];
+  pathsToWatch = getPathsToWatchArray(config);
+  for (i in pathsToWatch) {
+    for (j in config.ignorePaths) {
+      paths.push(pathsToWatch[i] + '/' + config.ignorePaths[j]);
+    }
+  }
+  return paths;
+}
+
 watchr.watch({
   paths: getPathsToWatchArray(config),
   ignoreHiddenFiles: config.ignoreHiddenFiles,
   ignoreCommonPatterns: config.ignoreCommonPatterns,
+  ignoreCustomPatterns: getPatterns(config),
+  ignorePaths: getPathsToIgnore(config),
   listeners: {
     change: changeHandler,
     watching: function(error, watcherInstance, isWatching) {
