@@ -1,5 +1,5 @@
 {
-  "name": "watching
+  "name": "watcher test",
   "dependencies": {
     "supervisor": {
       "version": "0.5.2"
