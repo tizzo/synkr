@@ -19,6 +19,9 @@ DirectoryWatcher.prototype.getStat = function(path, next) {
   });
 };
 DirectoryWatcher.prototype.recursiveWatch = function(path, watchList, depth, next) {
+  if (!depth) {
+    depth = 0;
+  }
   console.log('called upon to log ' + path);
   self = this;
   fs.readdir(path, function(err, files) {
