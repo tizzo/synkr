@@ -23,6 +23,9 @@ DirectoryWatcher.prototype.recursiveWatch = function(path, watchList, depth, nex
   fs.readdir(path, function(err, files) {
     for (i in files) {
       var item = files[i];
+      // Here we have a closure factory to ensure that we
+      // know what item we were operating on once our async
+      // callback is fired.
       var callbackMaker = function(item) {
         var innerItem = item;
         return function(error, stat) {
