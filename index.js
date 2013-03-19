@@ -14,12 +14,26 @@ DirectoryWatcher.prototype.watchList = [];
 DirectoryWatcher.prototype.setPath = function(path) {
   this.path = path;
 };
+DirectoryWatcher.prototype.log = function(level, message, object) {
+  if (level != 'error') {
+    console.log(message, object);
+  }
+  else {
+    console.error(message, object);
+  }
+}
+DirectoryWatcher.prototype.info = function(message) {
+  this.log('info', message);
+}
+DirectoryWatcher.prototype.error = function(message) {
+  this.log('error', message);
+}
 DirectoryWatcher.prototype.recursiveWatch = function(path, watchList, depth, next) {
   if (!depth) {
     depth = 0;
   }
-  console.log('called upon to log ' + path);
   var self = this;
+  self.info('called upon to log ' + path);
   fs.readdir(path, function(err, files) {
     for (i in files) {
       var item = files[i];
@@ -30,11 +44,11 @@ DirectoryWatcher.prototype.recursiveWatch = function(path, watchList, depth, nex
         var innerItem = item;
         return function(error, stat) {
           if (error) {
-            console.error('Deal with me! - '.red, innerItem);
+            self.error('Deal with me! - '.red, innerItem);
           }
           else {
             if (stat.isDirectory()) {
-              console.log('Diving into ' + innerItem);
+              self.info('Diving into ' + innerItem);
               var watcher = watchList[innerItem] = new DirectoryWatcher(innerItem);
               watcher.recursiveWatch(innerItem, watchList, depth + 1);
             }
@@ -48,32 +62,32 @@ DirectoryWatcher.prototype.recursiveWatch = function(path, watchList, depth, nex
   self.watcher = fs.watch(path, self.changeHandler)
   watchList[path] = this;
   var message = 'Currently there are ' + _.keys(watchList).length + ' watchers.';
-  console.log(message.green);
-  console.log('depth is now: '.blue + depth);
+  self.info(message.green);
+  self.info('depth is now: '.blue + depth);
   if (next && next) {
-    console.log('**************here');
+    self.info('**************logging done');
     next(null);
   }
 }
 DirectoryWatcher.prototype.watch = function() {
   self = this;
   this.recursiveWatch(this.path, this.watchList, 1, function(error) {
-    console.log(error);
+    self.error(error);
   });
 };
 DirectoryWatcher.prototype.changeHandler = function(change, file) {
   self = this;
   var path = self.path + '/' + file;
-  console.log(path + ': ' + change);
+  self.info(path + ': ' + change);
   fs.stat(path, function(error, stat) {
     if (error) {
-      console.log(path, 'may have been deleted', error);
+      self.info(path, 'may have been deleted', error);
     }
     else {
       if (stat.isDirectory()) {
         self.recursiveWatch(path, self.watchList);
       }
-      console.log('may be a directory?', stat.isDirectory());
+      self.info('may be a directory?', stat.isDirectory());
     }
   });
 };
