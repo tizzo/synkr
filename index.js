@@ -24,7 +24,9 @@ watcher.on('watchAdded', function(watch) {
   self.info(message.green);
 });
 watcher.on('watchDeleted', function(path) {
-  console.log('watch deleted ', path);
+  console.log('watch deleted '.magenta, path);
+  var message = 'Currently there are ' + _.keys(watcher.watchList).length + ' watchers.';
+  console.log(message.green);
 });
 watcher.on('fileDeletion', function(path) {
   console.log('deleted: ' + path);
