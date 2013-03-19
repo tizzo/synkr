@@ -79,6 +79,6 @@ DirectoryWatcher.prototype.changeHandler = function(change, file) {
 };
 
 
-watcher = new DirectoryWatcher('/home/webadmin/test');
+watcher = new DirectoryWatcher('/home/vagrant/test');
 //watcher = new DirectoryWatcher('/var/lib/templeton_backups');
 watcher.watch();
