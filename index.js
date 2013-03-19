@@ -21,7 +21,10 @@ watcher.on('ready', function() {
 });
 watcher.on('watchAdded', function(watch) {
   var message = 'Currently there are ' + _.keys(watcher.watchList).length + ' watchers.';
-  self.info(message.green);
+  self.info(message.green, _.keys(watcher.watchList));
+});
+watcher.on('watchDeleted', function(path) {
+  console.log('watch deleted ', path);
 });
 watcher.on('fileDeletion', function(path) {
   console.log('deleted: ' + path);
