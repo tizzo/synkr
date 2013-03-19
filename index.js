@@ -17,11 +17,11 @@ watcher.on('log', function(data) {
   }
 });
 watcher.on('ready', function() {
-  console.log('watching totally started.'.green);
+  console.log('watching event fired.'.green);
 });
 watcher.on('watchAdded', function(watch) {
   var message = 'Currently there are ' + _.keys(watcher.watchList).length + ' watchers.';
-  self.info(message.green, _.keys(watcher.watchList));
+  self.info(message.green);
 });
 watcher.on('watchDeleted', function(path) {
   console.log('watch deleted ', path);
@@ -33,5 +33,5 @@ watcher.on('fileChange', function(path) {
   console.log('changed: ' + path);
 });
 watcher.watch(function() {
-  console.log('watching totally started.'.cyan);
+  console.log('watch complete callback called.'.cyan);
 });
