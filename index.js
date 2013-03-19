@@ -1,7 +1,7 @@
 var DirectoryWatcher = require('./lib/DirectoryWatcher');
+var colors = require('colors');
 watcher = new DirectoryWatcher('/home/vagrant/test');
 watcher.on('log', function(data) {
-
   if (data.level != 'error') {
     logger = console.log;
   }
@@ -15,4 +15,6 @@ watcher.on('log', function(data) {
     logger(data.message);
   }
 });
-watcher.watch();
+watcher.watch(function() {
+  console.log('watching totally started.'.cyan);
+});
