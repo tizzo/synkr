@@ -1,15 +1,14 @@
 # An array of paths to watch for new content.
 pathsToWatch:
-  "/Users/howard/Desktop":
-    remoteServer: jtflnfs1.templeton.org
-    remoteUser: webadmin
-    remotePort: 22
-    command: rsync
-    commandOptions:
+  "/home/vagrant/test":
     remotePath: '/backups/somefolder'
+privateKeyPath: /home/vagrant/vagrant-privatekey.rsa
+remoteUser: vagrant
+remoteHost: 33.33.33.40
+remotePort: 22
 # An array fo file extensions to exclude from triggering a scan.
-fileTypesToExclude: [
-  "nfo",
-  "tbn"
-]
-ignoreHiddenFiles: true
+# fileTypesToExclude: [
+#   "nfo",
+#   "tbn"
+# ]
+# ignoreHiddenFiles: true
