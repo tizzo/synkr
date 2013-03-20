@@ -3,7 +3,7 @@ var config, options, request, watchr, winston;
 var fs = require('fs'),
   //watchr = require('watchr'),
   winston = require('winston'),
-  async = require('async'),
+  async = require('async')
   DirectoryWatcher = require('./lib/DirectoryWatcher');
 
 var connection = require('./lib/SSHConnection');
