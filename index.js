@@ -23,12 +23,11 @@ require('js-yaml');
 
 // Load our configuration from the yaml file.
 var config = require('./config');
-
 connection.configure({
   host: config.remoteHost,
   port: config.remotePort,
   username: config.remoteUser,
-  privateKey: require('fs').readFileSync(config.privateKeyPath)
+  privateKey: fs.readFileSync(config.privateKeyPath)
 });
 
 // A local cache of directories that should be in a known-existent state.
