@@ -1,11 +1,12 @@
 var config, options, request, watchr, winston;
 
 var fs = require('fs'),
-  watchr = require('watchr'),
+  //watchr = require('watchr'),
   winston = require('winston'),
-  async = require('async');
+  async = require('async'),
+  DirectoryWatcher = require('./lib/DirectoryWatcher');
 
-var connection = require('./lib/ssh-connection');
+var connection = require('./lib/SSHConnection');
 
 // A queue of operations that need to be synchronized with the remote.
 var queue = [];
@@ -223,11 +224,13 @@ var getRemotePath = function(filePath, conf) {
   return remotePath + getLocalPath(filePath, conf);
 }
 
-var deleteHandler = function(changeType, filePath, fileCurrentStat, filePreviousStat, conf, next) {
+var deleteHandler = function(changeType, filePath, fileCurrentStat, conf, next) {
   var localPath = getLocalPath(filePath, conf);
   if (directoriesEnsured.indexOf(localPath) != -1) {
     directoriesEnsured.splice(directoriesEnsured.indexOf(localPath), 1);
   }
+  /*
+  // TODO: We will need to detect somehow if this had been a directory (probably by seeing if we can delete a directory on the other side or now).
   if (filePreviousStat.isDirectory()) {
     connection.rmdir(getRemotePath(filePath, conf), function(error) {
       if (error) {
@@ -239,7 +242,8 @@ var deleteHandler = function(changeType, filePath, fileCurrentStat, filePrevious
       }
     });
   }
-  else {
+  */
+  //else {
     connection.delete(getRemotePath(filePath, conf), function(error) {
       if (error) {
         enqueueCommand(deleteHandler, arguments);
@@ -249,9 +253,10 @@ var deleteHandler = function(changeType, filePath, fileCurrentStat, filePrevious
         next(null);
       }
     });
-  }
+  //}
 };
 
+// TODO: Fix or remove...
 var getPatterns = function(config) {
   patterns = [];
   for (i in config.fileTypesToExclude) {
@@ -276,6 +281,9 @@ var getPathsToIgnore = function(config) {
   return paths;
 }
 
+
+/*
+// TODO: This is all deprecated.
 watchr.watch({
   paths: getPathsToWatchArray(config),
   ignoreHiddenFiles: config.ignoreHiddenFiles,
@@ -293,6 +301,16 @@ watchr.watch({
     return winston.info(getPathsToWatchArray(config).join(', ') + " now watched for changes.");
   }
 });
+*/
+var paths = getPathsToWatchArray(config);
+for (i in paths) {
+  var path = paths[i];
+  var watcher = new DirectoryWatcher(path);
+  watcher.watch();
+  watcher.on('ready', function() {
+    console.log('Now watching ' + path);
+  }
+}
 
 connection.on('ready', function() {
   processQueue();
