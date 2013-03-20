@@ -203,15 +203,15 @@ var createDirectory = function(changeType, filePath, fileCurrentStat, conf, done
 };
 
 
-var changeHandler = function(changeType, filePath, fileCurrentStat, filePreviousStat) {
+var changeHandler = function(changeType, filePath, fileCurrentStat) {
   winston.info(filePath + ' ' + changeType + 'd.');
   var conf = findOptionDefinition(filePath);
   if (changeType == 'create' || changeType == 'update') {
-    enqueueCommand(createOrUpdateHandler, [changeType, filePath, fileCurrentStat, filePreviousStat, conf]);
+    enqueueCommand(createOrUpdateHandler, [changeType, filePath, fileCurrentStat, conf]);
   }
   else if (changeType == 'delete') {
-    // deleteHandler(changeType, filePath, fileCurrentStat, filePreviousStat, conf);
-    enqueueCommand(deleteHandler, [changeType, filePath, fileCurrentStat, filePreviousStat, conf]);
+    // deleteHandler(changeType, filePath, fileCurrentStat, conf);
+    enqueueCommand(deleteHandler, [changeType, filePath, fileCurrentStat, conf]);
   }
   else {
     throw new Error('Invalid change type `' + changeType + '` on file `' + filePath + '`.');
@@ -308,7 +308,7 @@ for (i in paths) {
   watcher.watch();
   watcher.on('ready', function() {
     console.log('Now watching ' + path);
-  }
+  });
 }
 
 connection.on('ready', function() {
