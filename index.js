@@ -1,7 +1,6 @@
 var config, options, request, watchr, winston;
 
 var fs = require('fs'),
-  //watchr = require('watchr'),
   winston = require('winston'),
   async = require('async')
   DirectoryWatcher = require('./lib/DirectoryWatcher');
@@ -277,27 +276,6 @@ var getPathsToIgnore = function(config) {
   return paths;
 }
 
-
-/*
-// TODO: This is all deprecated.
-watchr.watch({
-  paths: getPathsToWatchArray(config),
-  ignoreHiddenFiles: config.ignoreHiddenFiles,
-  ignoreCommonPatterns: config.ignoreCommonPatterns,
-  ignoreCustomPatterns: getPatterns(config),
-  ignorePaths: getPathsToIgnore(config),
-  listeners: {
-    change: changeHandler,
-    watching: function(error, watcherInstance, isWatching) {
-      watchers.push(watcherInstance);
-    },
-  },
-  next: function(err, fileWatchers) {
-    watchers = fileWatchers;
-    return winston.info(getPathsToWatchArray(config).join(', ') + " now watched for changes.");
-  }
-});
-*/
 var paths = getPathsToWatchArray(config);
 for (i in paths) {
   var path = paths[i];
