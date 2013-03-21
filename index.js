@@ -277,12 +277,14 @@ var getPathsToIgnore = function(config) {
 }
 
 var paths = getPathsToWatchArray(config);
-for (i in paths) {
-  var path = paths[i];
+
+var setupWatch = function(path, done) {
   var watcher = new DirectoryWatcher(path);
-  watcher.watch();
   watcher.on('ready', function() {
-    console.log('Now watching ' + path);
+    done();
+  });
+  watcher.on('error', function(error) {
+    done(error);
   });
   watcher.on('fileChange', function(path, stat) {
     console.log('changed: ' + path);
@@ -292,7 +294,13 @@ for (i in paths) {
     console.log('deleted: ' + path);
     changeHandler('delete', path, stat)
   });
-}
+  watcher.watch();
+};
+
+// Setup our watch for each directory.
+async.each(paths, setupWatch, function(error) {
+  winston.info(getPathsToWatchArray(config).join(', ') + " now watched for changes.");
+});
 
 connection.on('ready', function() {
   processQueue();
