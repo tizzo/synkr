@@ -155,7 +155,7 @@ var findOptionDefinition = function(filePath) {
 };
 
 
-var createOrUpdateHandler = function(changeType, filePath, fileCurrentStat, filePreviousStat, conf, next) {
+var createOrUpdateHandler = function(changeType, filePath, fileCurrentStat, conf, next) {
   winston.info(changeType, filePath);
   createDirectory(changeType, filePath, fileCurrentStat, conf, function(error, success) {
     if (error) {
@@ -171,7 +171,7 @@ var createOrUpdateHandler = function(changeType, filePath, fileCurrentStat, file
     else {
       winston.info('Direcotry ' + filePath + ' successfully created');
       if (typeof next != 'function') {
-        winston.info('****************** Bad next operation encountered ! ******************');
+        winston.error('****************** Bad next operation encountered ! ******************');
         console.log(next);
       }
       else {
@@ -206,15 +206,11 @@ var createDirectory = function(changeType, filePath, fileCurrentStat, conf, done
 var changeHandler = function(changeType, filePath, fileCurrentStat) {
   winston.info(filePath + ' ' + changeType + 'd.');
   var conf = findOptionDefinition(filePath);
-  if (changeType == 'create' || changeType == 'update') {
-    enqueueCommand(createOrUpdateHandler, [changeType, filePath, fileCurrentStat, conf]);
-  }
-  else if (changeType == 'delete') {
-    // deleteHandler(changeType, filePath, fileCurrentStat, conf);
+  if (changeType == 'delete') {
     enqueueCommand(deleteHandler, [changeType, filePath, fileCurrentStat, conf]);
   }
   else {
-    throw new Error('Invalid change type `' + changeType + '` on file `' + filePath + '`.');
+    enqueueCommand(createOrUpdateHandler, [changeType, filePath, fileCurrentStat, conf]);
   }
 };
 
@@ -229,7 +225,8 @@ var deleteHandler = function(changeType, filePath, fileCurrentStat, conf, next) 
     directoriesEnsured.splice(directoriesEnsured.indexOf(localPath), 1);
   }
   /*
-  // TODO: We will need to detect somehow if this had been a directory (probably by seeing if we can delete a directory on the other side or now).
+  // TODO: We will need to detect somehow if this had been a directory
+  // (probably by seeing if we can delete a directory on the other side or now).
   if (filePreviousStat.isDirectory()) {
     connection.rmdir(getRemotePath(filePath, conf), function(error) {
       if (error) {
@@ -308,6 +305,14 @@ for (i in paths) {
   watcher.watch();
   watcher.on('ready', function() {
     console.log('Now watching ' + path);
+  });
+  watcher.on('fileChange', function(path, stat) {
+    console.log('changed: ' + path);
+    changeHandler('change', path, stat)
+  });
+  watcher.on('fileDeletion', function(path, stat) {
+    console.log('deleted: ' + path);
+    changeHandler('delete', path, stat)
   });
 }
 
