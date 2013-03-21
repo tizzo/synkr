@@ -223,58 +223,16 @@ var deleteHandler = function(changeType, filePath, fileCurrentStat, conf, next) 
   if (directoriesEnsured.indexOf(localPath) != -1) {
     directoriesEnsured.splice(directoriesEnsured.indexOf(localPath), 1);
   }
-  /*
-  // TODO: We will need to detect somehow if this had been a directory
-  // (probably by seeing if we can delete a directory on the other side or now).
-  if (filePreviousStat.isDirectory()) {
-    connection.rmdir(getRemotePath(filePath, conf), function(error) {
-      if (error) {
-        enqueueCommand(deleteHandler, arguments);
-        next(error);
-      }
-      else {
-        next(null);
-      }
-    });
-  }
-  */
-  //else {
-    connection.delete(getRemotePath(filePath, conf), function(error) {
-      if (error) {
-        enqueueCommand(deleteHandler, arguments);
-        next(error);
-      }
-      else {
-        next(null);
-      }
-    });
-  //}
-};
-
-// TODO: Fix or remove...
-var getPatterns = function(config) {
-  patterns = [];
-  for (i in config.fileTypesToExclude) {
-    // patterns.push(new RegExp('.*\.' + config.fileTypesToExclude[i]));
-  }
-  for (i in config.patternsToExclude) {
-    // patterns.push(new RegExp(config.patternsToExclude[i]));
-  }
-  // console.log(patterns);
-  // return patterns;
-  return new RegExp('fdsa')
-}
-
-var getPathsToIgnore = function(config) {
-  paths = [];
-  pathsToWatch = getPathsToWatchArray(config);
-  for (i in pathsToWatch) {
-    for (j in config.ignorePaths) {
-      paths.push(pathsToWatch[i] + '/' + config.ignorePaths[j]);
+  connection.delete(getRemotePath(filePath, conf), function(error) {
+    if (error) {
+      enqueueCommand(deleteHandler, arguments);
+      next(error);
     }
-  }
-  return paths;
-}
+    else {
+      next(null);
+    }
+  });
+};
 
 var paths = getPathsToWatchArray(config);
 
