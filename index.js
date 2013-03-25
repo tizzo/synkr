@@ -253,11 +253,16 @@ var setupWatch = function(path, done) {
     changeHandler('delete', path, stat)
   });
   watcher.watch();
+  console.log(watcher.path.yellow);
 };
 
 // Setup our watch for each directory.
 async.each(paths, setupWatch, function(error) {
-  winston.info(getPathsToWatchArray(config).join(', ') + " now watched for changes.");
+  var paths = getPathsToWatchArray(config);
+  if (paths.length > 1) {
+    paths.push('and ' + paths.pop());
+  }
+  winston.info('Now watching ' + paths.join(', ') + " for changes.");
 });
 
 connection.on('ready', function() {
