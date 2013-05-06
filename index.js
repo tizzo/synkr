@@ -48,6 +48,9 @@ var getLocalPath = function(filePath, conf) {
   return filePath.substring(conf.localPath.length);
 };
 
+/**
+ * Find the path.
+ */
 var findDirectoryPath = function(filePath, fileCurrentStat) {
   if (fileCurrentStat !== null && !fileCurrentStat.isDirectory()) {
     directoryToEnsure = filePath.split('/');
@@ -60,6 +63,9 @@ var findDirectoryPath = function(filePath, fileCurrentStat) {
   return directoryToEnsure
 };
 
+/**
+ * Synchronize a file with the remote server.
+ */
 var syncFile = function(conf, changeType, filePath, fileCurrentStat, done) {
   connection.transferFile(filePath, getRemotePath(filePath, conf), function(error, success) {
     if (error) {
@@ -73,6 +79,9 @@ var syncFile = function(conf, changeType, filePath, fileCurrentStat, done) {
   });
 };
 
+/**
+ * Enqueue a command to be processed (we only do one at a time).
+ */
 var enqueueCommand = function(command, arguments) {
   queue.push([command, arguments]);
   if (!queueProcessing) {
@@ -80,7 +89,9 @@ var enqueueCommand = function(command, arguments) {
   }
 }
 
-
+/**
+ * Process our job queue.
+ */
 var processQueue = function() {
   winston.info('Processing Queue');
   if (queue.length > 0 && queueProcessing == false) {
