@@ -235,33 +235,33 @@ var deleteHandler = function(changeType, filePath, fileCurrentStat, conf, next) 
 };
 
 var paths = getPathsToWatchArray(config);
-
 var setupWatch = function(path, done) {
-  var watcher = new DirectoryWatcher(path);
-  watcher.on('ready', function() {
-    done();
-  });
-  watcher.on('error', function(error) {
-    done(error);
-  });
-  watcher.on('fileChange', function(path, stat) {
-    console.log('changed: ' + path);
-    changeHandler('change', path, stat)
-  });
-  watcher.on('fileDeletion', function(path, stat) {
-    console.log('deleted: ' + path);
-    changeHandler('delete', path, stat)
-  });
-  watcher.watch();
-  console.log(watcher.path.yellow);
+  var callbackMaker = function(path, done) {
+    return function() {
+      var watcher = new DirectoryWatcher(path);
+      watcher.on('fileChange', function(path, stat) {
+        console.log('changed: ' + path);
+        changeHandler('change', path, stat)
+      });
+      watcher.on('fileDeletion', function(path, stat) {
+        console.log('deleted: ' + path);
+        changeHandler('delete', path, stat)
+      });
+      watcher.on('error', function(error) {
+        done(error);
+        var message = 'Watching ' + path + ' failed.';
+        console.error(message);
+        process.exit(1);
+      });
+      watcher.watch(function() {
+        done();
+      });
+    };
+  };
+  callbackMaker(path, done)();
 };
 
-// Setup our watch for each directory.
-async.each(paths, setupWatch, function(error) {
-  var paths = getPathsToWatchArray(config);
-  if (paths.length > 1) {
-    paths.push('and ' + paths.pop());
-  }
+async.each(paths, setupWatch, function() {
   winston.info('Now watching ' + paths.join(', ') + " for changes.");
 });
 
