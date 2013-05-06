@@ -152,7 +152,7 @@ var findOptionDefinition = function(filePath) {
   var match = '';
   for (path in config.pathsToWatch) {
     searchPattern = '';
-    if (filePath.search(searchPattern) == 0 && path.length > match) {
+    if (filePath.search(searchPattern) == 0 && path.length > match.length) {
       match = path;
     }
   }
