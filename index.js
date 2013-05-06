@@ -182,7 +182,7 @@ var createOrUpdateHandler = function(changeType, filePath, fileCurrentStat, conf
       winston.info('Direcotry ' + filePath + ' successfully created');
       if (typeof next != 'function') {
         winston.error('****************** Bad next operation encountered ! ******************');
-        console.error(next);
+        winston.error(next);
       }
       else {
         next(null);
@@ -251,17 +251,17 @@ var setupWatch = function(path, done) {
     return function() {
       var watcher = new DirectoryWatcher(path);
       watcher.on('fileChange', function(path, stat) {
-        console.log('changed: ' + path);
+        winston.info('changed: ' + path);
         changeHandler('change', path, stat)
       });
       watcher.on('fileDeletion', function(path, stat) {
-        console.log('deleted: ' + path);
+        winsotn.info('deleted: ' + path);
         changeHandler('delete', path, stat)
       });
       watcher.on('error', function(error) {
         done(error);
         var message = 'Watching ' + path + ' failed.';
-        console.error(message);
+        winston.error(message);
         process.exit(1);
       });
       watcher.watch(function() {
