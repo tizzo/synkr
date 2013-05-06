@@ -171,7 +171,7 @@ var createOrUpdateHandler = function(changeType, filePath, fileCurrentStat, conf
       winston.info('Direcotry ' + filePath + ' successfully created');
       if (typeof next != 'function') {
         winston.error('****************** Bad next operation encountered ! ******************');
-        console.log(next);
+        console.error(next);
       }
       else {
         next(null);
