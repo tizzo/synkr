@@ -151,8 +151,7 @@ var processQueueItem = function(done) {
 var findOptionDefinition = function(filePath) {
   var match = '';
   for (path in config.pathsToWatch) {
-    searchPattern = '';
-    if (filePath.search(searchPattern) == 0 && path.length > match.length) {
+    if (filePath.search(path) == 0 && path.length > match.length) {
       match = path;
     }
   }
