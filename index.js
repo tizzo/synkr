@@ -197,11 +197,13 @@ var createDirectory = function(changeType, filePath, fileCurrentStat, conf, done
     winston.info('Trying to ensure `' + directoryToEnsure + '` exists.');
     // fileCurrentStat could be null because this is a deletion.
     var command = 'mkdir -p ' + conf.remotePath + directoryToEnsure;
-    directoriesEnsured.push(directoryToEnsure);
     // TODO: Should we do this over sftp rather than exec?
     connection.exec(command, function(error, exitCode) {
       if (error) {
         winston.error('This is an error of some kind', error);
+      }
+      else {
+        directoriesEnsured.push(directoryToEnsure);
       }
       done(error, true);
     });
